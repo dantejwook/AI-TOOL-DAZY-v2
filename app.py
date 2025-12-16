@@ -1,4 +1,25 @@
 # app.py
+# ✅ app.py 맨 상단 (최상단)
+
+import streamlit as st
+
+# ✅ 필수 예외 처리 + 초기 세팅
+try:
+    import openai
+    import os
+
+    # OpenAI API 키 가져오기
+    openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+    # 기본 디렉토리 생성
+    os.makedirs("data", exist_ok=True)
+    os.makedirs("outputs", exist_ok=True)
+
+    st.session_state["init_ok"] = True
+
+except Exception as e:
+    st.error(f"앱 초기화 중 오류 발생 ❌: {e}")
+    st.stop()  # 앱 중단
 
 import os
 import re
@@ -238,3 +259,4 @@ if st.button("🚀 의미 기반 분석 실행"):
 
         with open(OUTPUT_ZIP_PATH, "rb") as f:
             st.download_button("📦 요약 결과 ZIP 다운로드", f, file_name="summaries.zip")
+
