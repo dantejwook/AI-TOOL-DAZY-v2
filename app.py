@@ -8,25 +8,21 @@ import openai
 # ----------------------------
 # 🌈 기본 페이지 설정
 # ----------------------------
-st.set_page_config(page_title="AI dazy document sorter", page_icon="🗂️", layout="wide")
+st.set_page_config(page_title="AI dazy document sorter (Fast Edition)", page_icon="🗂️", layout="wide")
 
 # ----------------------------
-# 🔐 OpenAI API Key 자동 감지
+# 🔐 OpenAI API Key 자동 감지 및 캐싱
 # ----------------------------
-openai.api_key = (
-    st.secrets.get("OPENAI_API_KEY")
-    or os.getenv("OPENAI_API_KEY")
-)
+@st.cache_data(show_spinner=False)
+def get_openai_key():
+    return st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+
+openai.api_key = get_openai_key()
 
 if not openai.api_key:
-    st.sidebar.error("🚨 OpenAI API Key가 없습니다. .streamlit/secrets.toml 파일이나 환경변수를 확인하세요.")
+    st.sidebar.error("🚨 OpenAI API Key가 없습니다. .streamlit/secrets.toml 또는 환경변수를 확인하세요.")
 else:
-    try:
-        # 연결 테스트
-        openai.models.list()
-        st.sidebar.success("✅ OpenAI API Key 연결 성공")
-    except Exception as e:
-        st.sidebar.error(f"❌ OpenAI API Key 확인 실패: {e}")
+    st.sidebar.success("✅ OpenAI API Key 로드 완료")
 
 # ----------------------------
 # 🎨 스타일 커스터마이징
@@ -99,7 +95,7 @@ with right_col:
     zip_placeholder = st.empty()
 
 # ----------------------------
-# ⚙️ 프로세싱 + 상태 표시
+# ⚙️ 상태 표시 + 로그 관리
 # ----------------------------
 status_placeholder = st.empty()
 log_box = st.empty()
@@ -111,17 +107,16 @@ def log(msg):
     log_box.markdown(log_html, unsafe_allow_html=True)
 
 # ----------------------------
-# 🧠 GPT 테스트 함수
+# 💾 ZIP 생성 (캐시 적용)
 # ----------------------------
-def test_openai_connection():
-    try:
-        response = openai.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": "Hello! This is a connection test."}]
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"❌ OpenAI API 호출 실패: {e}"
+@st.cache_resource
+def create_zip(files, output_dir):
+    zip_filename = "result_documents.zip"
+    with zipfile.ZipFile(zip_filename, "w") as zipf:
+        for file in files:
+            file_path = output_dir / file.name
+            zipf.write(file_path, arcname=file_path.name)
+    return zip_filename
 
 # ----------------------------
 # 🚀 메인 로직
@@ -132,20 +127,17 @@ if uploaded_files:
     output_dir = Path("output_docs")
     output_dir.mkdir(exist_ok=True)
 
-    for i, file in enumerate(uploaded_files, start=1):
-        file_path = output_dir / file.name
-        with open(file_path, "wb") as f:
-            f.write(file.read())
-        progress = int((i / total) * 100)
-        status_placeholder.markdown(f"<div class='status-bar'>[{progress}% processing ({i}/{total} complete)]</div>", unsafe_allow_html=True)
-        log(f"문서 처리 중: {file.name}")
-        time.sleep(0.4)  # 실제 처리 대체용 딜레이
+    with st.spinner("⚙️ 문서를 정리 중입니다... 잠시만 기다려주세요."):
+        for i, file in enumerate(uploaded_files, start=1):
+            file_path = output_dir / file.name
+            with open(file_path, "wb") as f:
+                f.write(file.read())
+            progress = int((i / total) * 100)
+            status_placeholder.markdown(f"<div class='status-bar'>[{progress}% processing ({i}/{total} complete)]</div>", unsafe_allow_html=True)
+            log(f"📄 문서 처리 중: {file.name}")
 
-    # ZIP 파일 생성
-    zip_filename = "result_documents.zip"
-    with zipfile.ZipFile(zip_filename, "w") as zipf:
-        for file_path in output_dir.iterdir():
-            zipf.write(file_path, arcname=file_path.name)
+        # ZIP 파일 생성
+        zip_filename = create_zip(uploaded_files, output_dir)
 
     with open(zip_filename, "rb") as f:
         zip_placeholder.download_button(
@@ -160,11 +152,6 @@ if uploaded_files:
         f"<div class='status-bar'>[100% complete – 모든 문서 정리 완료]</div>",
         unsafe_allow_html=True,
     )
-
-    # API 연결 테스트 실행
-    st.divider()
-    st.markdown("### 🤖 OpenAI 연결 테스트 결과")
-    st.info(test_openai_connection())
 
 else:
     status_placeholder.markdown(
