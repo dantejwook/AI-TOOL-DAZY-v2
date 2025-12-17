@@ -2,6 +2,7 @@ streamlit==1.40.0
 openai==1.52.0
 scikit-learn==1.5.2
 numpy==1.26.4
-hdbscan==0.8.33
+hdbscan==0.8.32
 pandas==2.2.3
 PyMuPDF==1.24.10
+
