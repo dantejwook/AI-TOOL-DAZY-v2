@@ -3,11 +3,30 @@ import time
 import zipfile
 import os
 from pathlib import Path
+import openai
 
 # ----------------------------
 # 🌈 기본 페이지 설정
 # ----------------------------
 st.set_page_config(page_title="AI dazy document sorter", page_icon="🗂️", layout="wide")
+
+# ----------------------------
+# 🔐 OpenAI API Key 자동 감지
+# ----------------------------
+openai.api_key = (
+    st.secrets.get("OPENAI_API_KEY")
+    or os.getenv("OPENAI_API_KEY")
+)
+
+if not openai.api_key:
+    st.sidebar.error("🚨 OpenAI API Key가 없습니다. .streamlit/secrets.toml 파일이나 환경변수를 확인하세요.")
+else:
+    try:
+        # 연결 테스트
+        openai.models.list()
+        st.sidebar.success("✅ OpenAI API Key 연결 성공")
+    except Exception as e:
+        st.sidebar.error(f"❌ OpenAI API Key 확인 실패: {e}")
 
 # ----------------------------
 # 🎨 스타일 커스터마이징
@@ -84,7 +103,6 @@ with right_col:
 # ----------------------------
 status_placeholder = st.empty()
 log_box = st.empty()
-
 log_messages = []
 
 def log(msg):
@@ -92,6 +110,22 @@ def log(msg):
     log_html = "<div class='log-box'>" + "<br>".join(log_messages[-10:]) + "</div>"
     log_box.markdown(log_html, unsafe_allow_html=True)
 
+# ----------------------------
+# 🧠 GPT 테스트 함수
+# ----------------------------
+def test_openai_connection():
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": "Hello! This is a connection test."}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"❌ OpenAI API 호출 실패: {e}"
+
+# ----------------------------
+# 🚀 메인 로직
+# ----------------------------
 if uploaded_files:
     log("파일 업로드 완료 ✅")
     total = len(uploaded_files)
@@ -126,6 +160,11 @@ if uploaded_files:
         f"<div class='status-bar'>[100% complete – 모든 문서 정리 완료]</div>",
         unsafe_allow_html=True,
     )
+
+    # API 연결 테스트 실행
+    st.divider()
+    st.markdown("### 🤖 OpenAI 연결 테스트 결과")
+    st.info(test_openai_connection())
 
 else:
     status_placeholder.markdown(
